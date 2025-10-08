@@ -1,0 +1,174 @@
+
+from dataclasses import dataclass
+from typing import Any, List, Optional, Set, Tuple, Iterable, Dict
+
+@dataclass(frozen=True)
+class Move:
+    move_time: Any
+    move_parent: Any
+    move_meta: Any
+    move_child: Any
+
+@dataclass(frozen=True)
+class LogMove:
+    log_time: Any
+    old_parent: Optional[Tuple[Any, Any]]
+    new_parent: Any
+    log_meta: Any
+    log_child: Any
+
+State = Tuple[List[LogMove], Set[Tuple[Any, Any, Any]]]
+
+def get_parent(tree: Set[Tuple[Any, Any, Any]], child: Any) -> Optional[Tuple[Any, Any]]:
+    matches = [(p, m) for (p, m, c) in tree if c == child]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+def _children_map(tree: Set[Tuple[Any, Any, Any]]) -> Dict[Any, List[Tuple[Any, Any]]]:
+    d: Dict[Any, List[Tuple[Any, Any]]] = {}
+    for p, m, c in tree:
+        d.setdefault(p, []).append((m, c))
+    return d
+
+def ancestor(tree: Set[Tuple[Any, Any, Any]], parent: Any, child: Any) -> bool:
+    children = _children_map(tree)
+    stack, seen = [parent], set()
+    while stack:
+        node = stack.pop()
+        if node == child and node != parent:
+            return True
+        if node in seen:
+            continue
+        seen.add(node)
+        for _, c in children.get(node, []):
+            if c == child and node == parent:
+                return True
+            stack.append(c)
+    return False
+
+def do_op(op: Move, tree: Set[Tuple[Any, Any, Any]]):
+    t, newp, m, c = op.move_time, op.move_parent, op.move_meta, op.move_child
+    oldp = get_parent(tree, c)
+    log = LogMove(t, oldp, newp, m, c)
+    if ancestor(tree, c, newp) or c == newp:
+        return log, set(tree)
+    new_tree = {(p2, m2, c2) for (p2, m2, c2) in tree if c2 != c}
+    new_tree.add((newp, m, c))
+    return log, new_tree
+
+def undo_op(logop: LogMove, tree: Set[Tuple[Any, Any, Any]]):
+    c = logop.log_child
+    base = {(p2, m2, c2) for (p2, m2, c2) in tree if c2 != c}
+    if logop.old_parent is None:
+        return base
+    oldp, oldm = logop.old_parent
+    base.add((oldp, oldm, c))
+    return base
+
+def redo_op(logop: LogMove, state: State) -> State:
+    ops, tree = state
+    move = Move(logop.log_time, logop.new_parent, logop.log_meta, logop.log_child)
+    op2, tree2 = do_op(move, tree)
+    return ([op2] + ops, tree2)
+
+def apply_op(op: Move, state: State) -> State:
+    log, tree1 = state
+    if not log:
+        op2, tree2 = do_op(op, tree1)
+        return ([op2], tree2)
+    logop, *ops = log
+    if op.move_time < logop.log_time:
+        undone_tree = undo_op(logop, tree1)
+        rec_ops, rec_tree = apply_op(op, (ops, undone_tree))
+        return redo_op(logop, (rec_ops, rec_tree))
+    op2, tree2 = do_op(op, tree1)
+    return ([op2] + log, tree2)
+
+def apply_ops(ops: Iterable[Move]) -> State:
+    state: State = ([], set())
+    for oper in ops:
+        state = apply_op(oper, state)
+    return state
+
+def unique_parent(tree: Set[Tuple[Any, Any, Any]]) -> bool:
+    seen: Dict[Any, Tuple[Any, Any]] = {}
+    for p, m, c in tree:
+        if c in seen:
+            return False
+        seen[c] = (p, m)
+    return True
+
+def acyclic(tree: Set[Tuple[Any, Any, Any]]) -> bool:
+    nodes = {p for (p, m, c) in tree} | {c for (p, m, c) in tree}
+    for n in nodes:
+        if ancestor(tree, n, n):
+            return False
+    return True
+
+def pretty_tree(tree: Set[Tuple[Any, Any, Any]]) -> str:
+    children = _children_map(tree)
+    roots = {p for (p, m, c) in tree} - {c for (p, m, c) in tree}
+    if not roots:
+        roots = {p for (p, m, c) in tree}
+    lines = []
+    def dfs(node: Any, depth: int):
+        lines.append("  " * depth + f"- {node}")
+        for m, c in sorted(children.get(node, []), key=lambda x: str(x)):
+            lines.append("  " * (depth + 1) + f"{m} -> {c}")
+            dfs(c, depth + 2)
+    for r in sorted(roots, key=lambda x: str(x)):
+        dfs(r, 0)
+    return "\n".join(lines)
+
+
+#threade safe states, 
+import threading
+
+class ThreadSafeState:
+
+    def __init__(self, initial_tree: Optional[Set[Tuple[Any, Any, Any]]] = None):
+        if initial_tree is None:
+            initial_tree = set()
+        self._state: State = ([], set(initial_tree))   
+        self._redo_stack: List[LogMove] = []
+        self._lock = threading.Lock()
+
+    def apply(self, op: Move) -> None:
+      
+        with self._lock:
+            self._redo_stack.clear()
+            self._state = apply_op(op, self._state)
+
+    def undo(self, n: int = 1) -> None:
+        with self._lock:
+            log, tree = self._state
+            for _ in range(n):
+                if not log:
+                    break
+                logop, *rest = log
+                tree = undo_op(logop, tree)
+                self._redo_stack.append(logop)
+                log = rest
+            self._state = (log, tree)
+
+    def redo(self, n: int = 1) -> None:
+        with self._lock:
+            for _ in range(n):
+                if not self._redo_stack:
+                    break
+                logop = self._redo_stack.pop()
+                self._state = redo_op(logop, self._state)
+
+    def snapshot(self) -> State:
+        with self._lock:
+            log, tree = self._state
+            return (list(log), set(tree))
+
+    def tree(self) -> Set[Tuple[Any, Any, Any]]:
+        with self._lock:
+            return set(self._state[1])
+
+    def log(self) -> List[LogMove]:
+        with self._lock:
+            return list(self._state[0])
