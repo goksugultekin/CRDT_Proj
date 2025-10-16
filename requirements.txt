@@ -1,0 +1,8 @@
+# Core dependencies for CRDT project
+# No external dependencies required for basic functionality
+
+# Optional development dependencies (uncomment if needed):
+# pytest>=7.0.0
+# black>=22.0.0
+# flake8>=4.0.0
+# mypy>=0.950
