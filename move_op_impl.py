@@ -118,14 +118,21 @@ def apply_op(op: Move, state: State) -> State:
     log, tree1 = state
     if not log:
         op2, tree2 = do_op(op, tree1)
-        return ([op2], tree2)
+        # Only add to log if the operation actually changed the tree
+        if tree2 != tree1:
+            return ([op2], tree2)
+        else:
+            return ([], tree1)  # Invalid operation, don't log it
     logop, *ops = log
     if op.move_time < logop.log_time:
-        undone_tree = undo_op(logop, tree1)
-        rec_ops, rec_tree = apply_op(op, (ops, undone_tree))
-        return redo_op(logop, (rec_ops, rec_tree))
+        # Small timestamp - reject the operation
+        return (log, tree1)  # Don't apply small timestamp operations
     op2, tree2 = do_op(op, tree1)
-    return ([op2] + log, tree2)
+    # Only add to log if the operation actually changed the tree
+    if tree2 != tree1:
+        return ([op2] + log, tree2)
+    else:
+        return (log, tree1)  # Invalid operation, don't log it
 
 def apply_ops(ops: Iterable[Move]) -> State:
     state: State = ([], set())

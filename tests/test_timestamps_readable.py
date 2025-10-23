@@ -5,8 +5,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+
+
+
+
 from move_op_impl import Move, ThreadSafeState, pretty_tree, unique_parent, acyclic
 from timestamper import Timestamper
+
 
 
 def is_tree_valid(tree, stage): 
@@ -15,6 +20,8 @@ def is_tree_valid(tree, stage):
     print(f"[{stage}] unique_parent={has_unique_parent}, acyclic={is_acyclic}")
     assert has_unique_parent and is_acyclic, f"tree invariants broken at {stage} stage"
 
+
+#Timestamp control test
 
 
 def test_basic_timestamp_tests():
@@ -40,16 +47,19 @@ def test_basic_timestamp_tests():
     print(pretty_tree(state.tree()))
     is_tree_valid(state.tree(), "initial")
     
+
+
     print("\n2. FIRST OPERATIONS - timestamp order is important")
     # t=1 Move A under B
     state.apply(Move(ts(), "B", "", "A"))   # timestamp = 1
     # t=2 Move A under C (newer timestamp)
     state.apply(Move(ts(), "C", "", "A"))   # timestamp = 2
     
+    
+
     print(pretty_tree(state.tree()))
-    # A should now be under C, not under B
-    assert ("C", "", "A") in state.tree(), "A should be under C"
-    assert ("B", "", "A") not in state.tree(), "A should not be under B"
+    assert ("C", "", "A") in state.tree()
+    assert ("B", "", "A") not in state.tree()
     is_tree_valid(state.tree(), "first_operations")
     
 
@@ -57,9 +67,9 @@ def test_basic_timestamp_tests():
 
 
     print("\n3. SMALL TIMESTAMP TEST")
-    # small timestamp from the past (t=0)
-    small_ts = ts.manual(0)  # manually give 0 timestamp
-    state.apply(Move(small_ts, "B", "", "A"))  # try to move A to B
+    # small timestamp(t=0)
+    small_ts = ts.manual(0)  
+    state.apply(Move(small_ts, "B", "", "A"))  #move A to B
     
     print(pretty_tree(state.tree()))
     # A should still be under C because small timestamp is invalid
@@ -72,15 +82,13 @@ def test_basic_timestamp_tests():
 
 
     print("\n4. VALID NEW OPERATION")
-    # valid operation with new timestamp
-    state.apply(Move(ts(), "B", "", "a1"))  # Move a1 under B
+
+    state.apply(Move(ts(), "B", "", "a1"))  # move a1 under B
     print(pretty_tree(state.tree()))
-    assert ("B", "", "a1") in state.tree(), "a1 should be under B"
+
+    assert ("B", "", "a1") in state.tree()
     is_tree_valid(state.tree(), "valid_operation")
-    
-    print("✓ basic timestamp tests completed!")
-
-
+    print("basic timestamp tests completed!")
 
 
 
@@ -107,11 +115,13 @@ def test_invalid_operations_and_undo_redo(): #cycles, sml ts
     
 
     
+
     print("\n2. PERFORM VALID OPERATIONS:")
-    # first perform valid operations
+
     state.apply(Move(ts(), "B", "", "a1"))  # move a1 to B
     print(pretty_tree(state.tree()))
     is_tree_valid(state.tree(), "valid_operations")
+
 
 
     
@@ -121,8 +131,8 @@ def test_invalid_operations_and_undo_redo(): #cycles, sml ts
 
     state.apply(Move(ts(), "a2", "", "A"))  # should be invalid
     print(pretty_tree(state.tree()))
-    assert ("root", "", "A") in state.tree(), "cycle should not be created, A should stay under root"
-    assert ("a2", "", "A") not in state.tree(), "A should not be under a2"
+    assert ("root", "", "A") in state.tree()
+    assert ("a2", "", "A") not in state.tree()
     is_tree_valid(state.tree(), "cycle_prevention")
 
 
@@ -133,13 +143,40 @@ def test_invalid_operations_and_undo_redo(): #cycles, sml ts
     state.apply(Move(small_ts, "root", "", "a1"))  # move a1 to root
     print(pretty_tree(state.tree()))
     # a1 should still be under B
-    assert ("B", "", "a1") in state.tree(), "small timestamp should not move a1!"
+    assert ("B", "", "a1") in state.tree()
     is_tree_valid(state.tree(), "small_ts_invalid")
     
 
 
+    print("\n5. SECOND SMALL TIMESTAMP TEST")
+    #move a2 with small timestamp
+    small_ts2 = ts.manual(0)
+    state.apply(Move(small_ts2, "root", "", "a2"))  # move a2 to root
+    print(pretty_tree(state.tree()))
 
-    print("\n5. UNDO/REDO TEST - after invalid operations:")
+    # a2 should still be under A
+    assert ("A", "", "a2") in state.tree()
+    assert ("root", "", "a2") not in state.tree()
+    is_tree_valid(state.tree(), "small_ts_second")
+    
+
+
+
+    print("\n6. THIRD SMALL TIMESTAMP TEST")
+    #move A with small timestamp
+    small_ts3 = ts.manual(0)
+    state.apply(Move(small_ts3, "B", "", "A"))  # move A to B
+    print(pretty_tree(state.tree()))
+    # A should still be under root
+    assert ("root", "", "A") in state.tree()
+    assert ("B", "", "A") not in state.tree()
+    is_tree_valid(state.tree(), "small_ts_third")
+    
+    
+
+
+
+    print("\n7. UNDO/REDO TEST - after invalid operations:")
     print("State before UNDO:")
     print(pretty_tree(state.tree()))
     
@@ -156,7 +193,7 @@ def test_invalid_operations_and_undo_redo(): #cycles, sml ts
     is_tree_valid(state.tree(), "after_redo")
     
 
-    print("\n6. MULTIPLE UNDO/REDO TEST:")
+    print("\n8. MULTIPLE UNDO/REDO TEST:")
     # undo multiple operations
     state.undo(2)  # undo last 2 operations
     print("\nAfter UNDO(2):")
@@ -169,7 +206,7 @@ def test_invalid_operations_and_undo_redo(): #cycles, sml ts
     print(pretty_tree(state.tree()))
     is_tree_valid(state.tree(), "multiple_redo")
     
-    print("✓ invalid operations and undo/redo tests completed")
+    print("invalid operations and undo/redo tests completed")
 
 
 
@@ -181,7 +218,7 @@ def test_timestamps_readable():
     """
     Main test function - runs all tests
     """
-    print("🚀 CRDT MOVE OPERATION TESTS STARTING...")
+    print("CRDT MOVE OPERATION TESTS STARTING...")
     print("=" * 50)
     
     try:
@@ -190,7 +227,7 @@ def test_timestamps_readable():
      
         
         print("\n" + "=" * 50)
-        print("🎉 ALL TESTS SUCCESSFULLY COMPLETED!")
+        print("ALL TESTS SUCCESSFULLY COMPLETED!")
         print("✅ Timestamp control is working")
         print("✅ Small timestamp operations are rejected")
         print("✅ Invalid operations (cycles) are prevented")
@@ -198,7 +235,7 @@ def test_timestamps_readable():
         print("✅ Tree structure is preserved")
         
     except Exception as e:
-        print(f"\n❌ TEST ERROR: {e}")
+        print(f"\nTEST ERROR: {e}")
         raise
 
 
