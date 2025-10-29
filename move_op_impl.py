@@ -56,10 +56,7 @@ def ancestor(tree: Set[Tuple[Any, Any, Any]], parent: Any, child: Any) -> bool:
     return False
 
 def do_op(op: Move, tree: Set[Tuple[Any, Any, Any]]):
-    """
-    Bir move operasyonunu uygula.
-    (log_entry, new_tree) döndürür.
-    """
+    
     if op is None:
         raise ValueError("Move operation cannot be None")
 
@@ -73,19 +70,19 @@ def do_op(op: Move, tree: Set[Tuple[Any, Any, Any]]):
     oldp = get_parent(tree, c)
     log = LogMove(t, oldp, newp, m, c)
 
-    # Kendine bağlama yasak
+   
     if c == newp:
         return log, set(tree)
 
-    # Cycle kontrolü: taşımadan sonraki durumu simüle edip c, newp'nin atası mı bak
+   
     temp_tree = {(p2, m2, c2) for (p2, m2, c2) in tree if c2 != c}
     temp_tree.add((newp, m, c))
 
     if ancestor(temp_tree, c, newp):
-        # Bu hamle cycle yaratır; uygulama!
+        
         return log, set(tree)
 
-    # Geçerli: eski kenarı çıkar, yenisini ekle
+  
     return log, temp_tree
 
 def undo_op(logop: LogMove, tree: Set[Tuple[Any, Any, Any]]):
@@ -109,9 +106,18 @@ def undo_op(logop: LogMove, tree: Set[Tuple[Any, Any, Any]]):
     return base
 
 def redo_op(logop: LogMove, state: State) -> State:
+    """Redo a previously undone operation"""
     ops, tree = state
+    # Create Move from LogMove
     move = Move(logop.log_time, logop.new_parent, logop.log_meta, logop.log_child)
+    # Apply the operation directly without timestamp checking
+    # (redo operations are already validated operations from history)
     op2, tree2 = do_op(move, tree)
+    # If cycle is detected, do_op returns the same tree unchanged
+    # Skip this operation and return state unchanged
+    if tree2 == tree:
+        return state
+    # Add to log (this operation was previously in log, just being reapplied)
     return ([op2] + ops, tree2)
 
 def apply_op(op: Move, state: State) -> State:
@@ -149,9 +155,7 @@ def unique_parent(tree: Set[Tuple[Any, Any, Any]]) -> bool:
     return True
 
 def acyclic(tree: Set[Tuple[Any, Any, Any]]) -> bool:
-    """
-    Gerçek cycle tespiti (DFS renkleme).
-    """
+    
     children = _children_map(tree)
     WHITE, GRAY, BLACK = 0, 1, 2
     color: Dict[Any, int] = {}
@@ -163,7 +167,7 @@ def acyclic(tree: Set[Tuple[Any, Any, Any]]) -> bool:
         for _, v in children.get(u, []):
             col = color.get(v, WHITE)
             if col == GRAY:
-                return False  # back-edge -> cycle
+                return False  #
             if col == WHITE:
                 if not dfs(v):
                     return False
@@ -232,7 +236,14 @@ class ThreadSafeState:
                 if not self._redo_stack:
                     break
                 logop = self._redo_stack.pop()
-                self._state = redo_op(logop, self._state)
+                ops, tree_before = self._state
+                new_state = redo_op(logop, self._state)
+                _, tree_after = new_state
+                # If cycle is detected, redo_op returns state unchanged (tree unchanged)
+                # Skip this operation and continue with next one
+                if tree_after == tree_before:
+                    continue
+                self._state = new_state
 
     def snapshot(self) -> State:
         with self._lock:

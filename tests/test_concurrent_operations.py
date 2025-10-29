@@ -58,6 +58,7 @@ def test_basic_concurrent_moves():
         state.apply(Move(ts(), "A", "", "b1"))
         return "Thread 3 completed: b1 -> A"
     
+
     print("\n3 threads running concurrently")
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
@@ -79,6 +80,7 @@ def test_basic_concurrent_moves():
     
     print("Test 1 successful: Concurrent move operations working")
     print()
+
 
 
 
@@ -108,6 +110,8 @@ def test_concurrent_undo_redo():
     print("Tree after operations:")
     print(pretty_tree(state.tree()))
     
+
+
     def thread1_undo():
         print("  Thread 1: Undoing 1 operation...")
         time.sleep(0.01)
@@ -165,8 +169,10 @@ def test_timestamp_conflicts():
     print("Initial tree:")
     print(pretty_tree(state.tree()))
     
+
+
     def thread1_same_timestamp():
-        print("  Thread 1: Using same timestamp (5)")
+        print("Thread 1: Using same timestamp (5)")
         time.sleep(0.01)
         same_ts = ts.manual(5)
         state.apply(Move(same_ts, "B", "", "a1"))
@@ -175,7 +181,7 @@ def test_timestamp_conflicts():
 
 
     def thread2_different_timestamp():
-        print("  Thread 2: Using different timestamp")
+        print("Thread 2: Using different timestamp")
         time.sleep(0.01)
         state.apply(Move(ts(), "A", "", "a1"))
         return "Thread 2: Different timestamp a1 -> A"
@@ -275,6 +281,8 @@ def test_high_concurrency():
 
 
 
+
+
 def test_concurrent_invalid_operations():
     """Test concurrent invalid operations (small timestamps)"""
     print("Test 5: Concurrent invalid operations")
@@ -319,7 +327,7 @@ def test_concurrent_invalid_operations():
     
 
 
-    print("\n3 threads running concurrently (valid + invalid operations)")
+    print("\n3 threads running concurrently")
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
             executor.submit(thread1_small_timestamp),
@@ -342,6 +350,17 @@ def test_concurrent_invalid_operations():
     
     print("Test 5 successful: Invalid operations rejected!")
     print()
+
+
+
+
+
+
+
+
+
+
+    
 
 
 def run_all_concurrent_tests():

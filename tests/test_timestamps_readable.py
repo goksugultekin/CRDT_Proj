@@ -50,10 +50,10 @@ def test_basic_timestamp_tests():
 
 
     print("\n2. FIRST OPERATIONS - timestamp order is important")
-    # t=1 Move A under B
-    state.apply(Move(ts(), "B", "", "A"))   # timestamp = 1
-    # t=2 Move A under C (newer timestamp)
-    state.apply(Move(ts(), "C", "", "A"))   # timestamp = 2
+    #t=1 Move A under B
+    state.apply(Move(ts(), "B", "", "A"))   #timestamp = 1
+    #t=2 Move A under C (newer timestamp)
+    state.apply(Move(ts(), "C", "", "A"))   #timestamp = 2
     
     
 
@@ -67,7 +67,7 @@ def test_basic_timestamp_tests():
 
 
     print("\n3. SMALL TIMESTAMP TEST")
-    # small timestamp(t=0)
+    
     small_ts = ts.manual(0)  
     state.apply(Move(small_ts, "B", "", "A"))  #move A to B
     
@@ -88,7 +88,7 @@ def test_basic_timestamp_tests():
 
     assert ("B", "", "a1") in state.tree()
     is_tree_valid(state.tree(), "valid_operation")
-    print("basic timestamp tests completed!")
+    print("basic timestamp tests completed")
 
 
 
@@ -194,11 +194,12 @@ def test_invalid_operations_and_undo_redo(): #cycles, sml ts
     
 
     print("\n8. MULTIPLE UNDO/REDO TEST:")
-    # undo multiple operations
+   
     state.undo(2)  # undo last 2 operations
     print("\nAfter UNDO(2):")
     print(pretty_tree(state.tree()))
     is_tree_valid(state.tree(), "multiple_undo")
+    
     
 
     state.redo(2)
