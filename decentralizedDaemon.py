@@ -8,21 +8,19 @@ from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 import threading
 import zmq
-from move_op import * #Move, LogMove , ThreadSafeState
+from move_op_imply import *
 from timestamper import Timestamper
 from my_marshal import *
-from moveclient import *
 
 
-class MoveServer:
+class decentralizedDaemon:
     """
-    Pattern:
-      - REP socket for commands (apply/undo/redo/snapshot)
-      - PUB socket to broadcast state changes
+
+      apply undo redo'un mantığı için pubsub kullanıyoruz. o başka dosyada
+      bu dosyada, 
     """
     def __init__(self,
                  rep_bind: str = "tcp://*:5555",
-                 pub_bind: str = "tcp://*:5556",
                  initial_tree: Optional[Set[Tuple[Any, Any, Any]]] = None):
         self.state = ThreadSafeState(initial_tree)
         self.clock = LamportClock()
@@ -30,7 +28,6 @@ class MoveServer:
         self.rep = self.ctx.socket(zmq.REP)
         self.rep.bind(rep_bind)
         self.pub = self.ctx.socket(zmq.PUB)
-        self.pub.bind(pub_bind)
         self._stop = threading.Event()
 
     def _reply(self, **payload):
