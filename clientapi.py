@@ -1,19 +1,17 @@
-# clientapi.py
 # Client API methods for CRDT operations
 
 from __future__ import annotations
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple  # ← Tuple eklendi
 from my_marshal import to_jsonable
-
 
 class ClientAPI:
     """Client API methods for CRDT operations"""
-    
+
     def __init__(self, client):
         self.client = client
         self.clock = client.clock
-    
+
     def apply(self, move_parent: Any, move_meta: Any, move_child: Any, move_time: Optional[int] = None):
         """Apply a single move operation"""
         if move_time is None:
@@ -25,7 +23,6 @@ class ClientAPI:
             "move_child": move_child
         }}
         resp = self.client._send(msg)
-        # merge clocks using the largest log_time we see (if any)
         log = resp.get("log", [])
         if log:
             self.clock.update_on_receive(max(int(l["log_time"]) for l in log))
@@ -40,8 +37,8 @@ class ClientAPI:
         for (p, m, c) in moves:
             batch.append({
                 "move_time": self.clock.tick(),
-                "move_parent": p, 
-                "move_meta": m, 
+                "move_parent": p,
+                "move_meta": m,
                 "move_child": c
             })
         resp = self.client._send({"cmd": "apply_batch", "moves": batch})

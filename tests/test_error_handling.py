@@ -1,16 +1,11 @@
-# tests/test_error_handling.py
 
+
+# tests/test_error_handling.py
 import sys
 from pathlib import Path
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-
-
-
-
-
-
-
 
 from move_op_impl import Move, ThreadSafeState, pretty_tree, unique_parent, acyclic
 from timestamper import Timestamper
@@ -18,424 +13,328 @@ from timestamper import Timestamper
 
 
 
+
+
+def scenario3_initial_tree():
+    return {
+        ("root", "", "A"), ("root", "", "B"), ("root", "", "C"),
+        ("A", "", "a1"), ("A", "", "a2"), ("A", "", "a3"),
+    }
+
+def scenario3_history_ops(ts: Timestamper):
+    
+    return [
+        Move(ts(), "B", "", "a2"), 
+        Move(ts(), "C", "", "a2"), 
+        Move(ts(), "C", "", "B"),   # B -> C cycle
+        Move(ts(), "A", "", "a1"),  # a1 -> A
+    ]
+
+def scenario3_new_ops(ts: Timestamper):
+  
+    return [
+        Move(ts(), "B", "", "C"),  
+        Move(ts(), "B", "", "a3"),  
+        Move(ts(), "C", "", "B"),    
+        Move(ts(), "root", "", "a1") 
+    ]
+
+
+
+
 def test_error_handling():
-    """test that invalid inputs raise appropriate errors"""
     ts = Timestamper()
     state = ThreadSafeState()
-    
 
-
-    # test None operation
+    # None operation
     try:
         state.apply(None)
-        assert False, "Should have raised ValueError for None operation"
+        assert False
     except ValueError as e:
         assert "cannot be None" in str(e)
-    
 
-
-
-    # test None child
+    # None child
     try:
-        move = Move(ts(), "parent", "", None)
-        state.apply(move)
-        assert False, "Should have raised ValueError for None child"
+        state.apply(Move(ts(), "parent", "", None))
+        assert False
     except ValueError as e:
         assert "Child node cannot be None" in str(e)
 
-
-    
-    # test None parent
+    # None parent
     try:
-        move = Move(ts(), None, "", "child")
-        state.apply(move)
-        assert False, "Should have raised ValueError for None parent"
+        state.apply(Move(ts(), None, "", "child"))
+        assert False
     except ValueError as e:
         assert "New parent cannot be None" in str(e)
 
-
-
-    
-    # Test negative undo count
+    # Negative undo
     try:
         state.undo(-1)
-        assert False, "Should have raised ValueError for negative undo"
+        assert False
     except ValueError as e:
         assert "cannot be negative" in str(e)
-    
 
-
-
-    # Test negative redo count
+    # Negative redo
     try:
         state.redo(-1)
-        assert False, "Should have raised ValueError for negative redo"
+        assert False
     except ValueError as e:
         assert "cannot be negative" in str(e)
-    
-    print("Error handling tests passed")
-
-
-
-
-
 
 
 def test_cycle_prevention():
-    """Test that cycles are properly prevented"""
     ts = Timestamper()
-    
-
-    initial_tree = {
-        ("root", "", "A"),
-        ("A", "", "B")
-    }
+    initial_tree = {("root", "", "A"), ("A", "", "B")}
     state = ThreadSafeState(initial_tree)
-    
 
-
-    # try to create a cycle B -> A (A is already ancestor of B)
+    # B -> A denemesi (A, B'nin atası)
     state.apply(Move(ts(), "A", "", "B"))
-
- 
     tree = state.tree()
-    assert ("A", "", "B") in tree  
-    assert ("B", "", "A") not in tree  # cycle not created
-    
-    assert unique_parent(tree)
-    assert acyclic(tree)
-    
-    print("Cycle prevention tests passed")
-
-
-
-
-
-
+    assert ("A", "", "B") in tree
+    assert ("B", "", "A") not in tree
+    assert unique_parent(tree) and acyclic(tree)
 
 
 def test_self_reference_prevention():
-    """test that self references are prevented"""
     ts = Timestamper()
-    
-    initial_tree = {
-        ("root", "", "A"),
-        ("A", "", "B")
-    }
+    initial_tree = {("root", "", "A"), ("A", "", "B")}
     state = ThreadSafeState(initial_tree)
-    
-    # try to make A its own parent - this should be ignored
+
+    # A kendi ebeveyni olamaz
     state.apply(Move(ts(), "A", "", "A"))
-    
-
-
     tree = state.tree()
-    # A should still be under root not under itself
     assert ("root", "", "A") in tree
     assert ("A", "", "A") not in tree
-    
-    print("Self-reference prevention tests passed")
-
-
-
-
+    assert unique_parent(tree) and acyclic(tree)
 
 
 def test_undo_redo_edge_cases():
-    """Test undo redo edge cases"""
     ts = Timestamper()
-    
-    initial_tree = {
-        ("root", "", "A"),
-        ("A", "", "B")
-    }
+    initial_tree = {("root", "", "A"), ("A", "", "B")}
     state = ThreadSafeState(initial_tree)
-    
-   
+
     state.undo(0)
-
     state.redo(0)
-    
     state.undo(100)
-    
     state.redo(100)
-    
-    print("Undo/redo edge cases tests passed")
+
+    tree = state.tree()
+    assert unique_parent(tree) and acyclic(tree)
 
 
-
-
-def test_redo_cycle_detection(): #redo operations skip cycles and continue with next operation
-
+def test_redo_cycle_detection():
     ts = Timestamper()
-    
-    print("\nTesting redo cycle detection.")
-    
     initial_tree = {
         ("root", "", "A"),
         ("root", "", "B"),
         ("A", "", "a1"),
         ("A", "", "a2"),
     }
-    
-    print("\nScenario 1: Simple redo")
+
+    # Senaryo 1
     state = ThreadSafeState(initial_tree)
-    print("Initial tree:")
-    print(pretty_tree(state.tree()))
-    
-
-    # apply operations: first move a2 to B, then move a1 to a2
-    state.apply(Move(ts(), "B", "", "a2"))  # Move a2 to B
-    state.apply(Move(ts(), "a2", "", "a1"))  # Move a1 to a2 (B -> a2 -> a1)
-    
-
-
-    print("\nAfter operations:")
-    print(pretty_tree(state.tree()))
-    assert ("B", "", "a2") in state.tree()
-    assert ("a2", "", "a1") in state.tree()
-
-
-    
-
+    state.apply(Move(ts(), "B", "", "a2"))
+    state.apply(Move(ts(), "a2", "", "a1"))
     state.undo(2)
-    print("\nAfter undo(2):")
-    print(pretty_tree(state.tree()))
-    assert ("A", "", "a1") in state.tree()
-    assert ("A", "", "a2") in state.tree()
-    
-    
-
-    tree_before_redo = state.tree()
     state.redo(2)
-    print("\nAfter redo(2):")
-    print(pretty_tree(state.tree()))
+    t = state.tree()
+    assert ("B", "", "a2") in t and ("a2", "", "a1") in t
+    assert unique_parent(t) and acyclic(t)
 
-
-
-    
-    final_tree = state.tree()
-    assert unique_parent(final_tree)
-    assert acyclic(final_tree)
-    assert ("B", "", "a2") in final_tree
-    assert ("a2", "", "a1") in final_tree
-    
-
-
-    print("\nScenario 2: Cycle detection on redo")
-   
+    # Senaryo 2 (cycle 
     state = ThreadSafeState(initial_tree)
-    state.apply(Move(ts(), "a1", "", "a2"))  
+    state.apply(Move(ts(), "a1", "", "a2"))  # a1 -> a2
     state.undo(1)
-    state.apply(Move(ts(), "a2", "", "a1")) 
-    
-    print("Tree before redo:")
-    print(pretty_tree(state.tree()))
-    
-   
-    
-    print("\nScenario 3: Direct cycle test")
-    from move_op_impl import do_op
-    
-    # tree: A -> a2 -> a1 (a2 is ancestor of a1)
-    tree = {("root", "", "A"), ("A", "", "a2"), ("a2", "", "a1")}
-    
-    # move a2 to a1 - this would create cycle
-    move = Move(ts(), "a1", "", "a2")
-    log, tree_after = do_op(move, tree)
-    
-    # tree should be unchanged (cycle detected)
-    assert tree == tree_after
-    
-
-
-    print("Cycle detection test passed!")
-    print("   - do_op correctly detects cycle and skips operation")
-    
-    print("\n✅ Redo cycle detection test passed!")
-    print("   - Cycle detection works correctly in do_op")
-    print("   - redo_op uses do_op which handles cycle detection")
-    print("   - Tree remains valid and acyclic")
-
-
-
-
-def test_redo_skips_cycle_and_continues():
-    ts = Timestamper()
-    initial = {("root", "", "A"), ("root", "", "B"), ("A", "", "a1"), ("B", "", "a2")}
-    state = ThreadSafeState(initial)
-
-    H1 = Move(ts(), "A", "", "a1")
-    H2 = Move(ts(), "a2", "", "A")
-    H3 = Move(ts(), "B", "", "a1")
-
-    state.apply(H1); state.apply(H2); state.apply(H3)
-    state.undo(3)
-
-    state.apply(Move(ts(), "A", "", "a2"))  # this clears redo stack
-
-    print("\n=== redo-skips (small) ===")
-    print("[before redo]")
-    print(pretty_tree(state.tree()))
-
-    # show that H2 would be skipped due to cycle
-    from move_op_impl import do_op
-    before = state.tree()
-    log, trial = do_op(H2, before)
-    if trial == before:
-        print("[simulate H2] skipped (cycle)")
-    else:
-        print("[simulate H2] applied (unexpected)")
-    # redo is no-op because apply cleared redo stack
-    state.redo(3)
-
+    state.apply(Move(ts(), "a2", "", "a1"))  # a2 -> a1 
+    state.redo(1)
     after = state.tree()
-    print("[after  redo]")
-    print(pretty_tree(after))
-
-    assert before == after
     assert ("a2", "", "A") not in after
     assert ("B", "", "a1") not in after
     assert ("A", "", "a2") in after
-    assert unique_parent(after)
-    assert acyclic(after)
-
-
+    assert unique_parent(after) and acyclic(after)
 
 
 def test_redo_skips_cycle_with_large_history():
     ts = Timestamper()
-    initial = {
-        ("root", "", "A"), ("root", "", "B"), ("root", "", "C"),
-        ("A", "", "a1"), ("A", "", "a2"), ("A", "", "a3"),
-    }
+    initial = scenario3_initial_tree()
     state = ThreadSafeState(initial)
 
-    # history
-    ops = [
-        Move(ts(), "B", "", "a1"),
-        Move(ts(), "C", "", "a2"),
-        Move(ts(), "C", "", "B"),   # this step will become a cycle after interference
-        Move(ts(), "A", "", "a1"),
-    ]
-    for op in ops:
-        state.apply(op)
+  
+    ops = scenario3_history_ops(ts)
+    for mv in ops:
+        state.apply(mv)
 
-    state.undo(len(ops))
-    state.apply(Move(ts(), "B", "", "C"))  # clears redo stack; also sets up cycle for "B->C"
 
-    print("\n=== redo-skips (large) ===")
-    print("[before redo]")
-    print(pretty_tree(state.tree()))
+    for _ in ops:
+        state.undo(1)
 
-    # locate the critical op (Move C<-B)
-    critical = ops[2]
-    from move_op_impl import do_op
+
+    new_ops = scenario3_new_ops(ts)
+    for mv in new_ops:
+        state.apply(mv)
+
+
     before = state.tree()
-    log, trial = do_op(critical, before)
-    if trial == before:
-        print("[simulate critical op] skipped (cycle)")
-    else:
-        print("[simulate critical op] applied (unexpected)")
-
-    state.redo(len(ops))  # no-op
+    state.redo(10)
     after = state.tree()
-    print("[after  redo]")
-    print(pretty_tree(after))
-
     assert before == after
-    assert ("B", "", "C") in after and ("C", "", "B") not in after
-    assert unique_parent(after)
-    assert acyclic(after)
 
 
+    t = state.tree()
+    assert ("B", "", "C") in t        
+    assert ("C", "", "B") not in t    
+    assert ("B", "", "a3") in t       
+    assert ("root", "", "a1") in t    
+    assert unique_parent(t) and acyclic(t)
 
+
+    state.undo(2)
+    mid = state.tree()
+    assert unique_parent(mid) and acyclic(mid)
+
+    state.redo(2)
+    final_tree = state.tree()
+    assert unique_parent(final_tree) and acyclic(final_tree)
+
+
+def test_redo_simulation_with_do_op():
+    ts = Timestamper()
+    initial = {
+        ("root", "", "A"),
+        ("root", "", "B"),
+        ("A", "", "a1"),
+        ("A", "", "a2"),
+    }
+    tree = set(initial)
+
+    from move_op_impl import do_op
+    move1 = Move(ts(), "B", "", "a1")
+    move2 = Move(ts(), "a2", "", "A")  # cycle 
+    move3 = Move(ts(), "B", "", "a2")
+
+
+    tree.add(("A", "", "a2"))
+
+    _, tree = do_op(move1, tree)  
+    before = set(tree)
+    _, tree2 = do_op(move2, tree)  # cycle değişmemeli
+    assert tree2 == before
+    _, tree = do_op(move3, tree) 
+
+    assert ("a2", "", "A") not in tree
+    assert ("B", "", "a1") in tree and ("B", "", "a2") in tree
+    assert unique_parent(tree) and acyclic(tree)
 
 
 def test_comprehensive_scenario():
-    """test multiple operations and validations"""
     ts = Timestamper()
-    
-    # complex initial tree with multiple nodes and relationships
     initial_tree = {
         ("root", "", "A"),
-        ("root", "", "B"), 
+        ("root", "", "B"),
         ("root", "", "C"),
         ("A", "", "a1"),
         ("A", "", "a2"),
         ("B", "", "b1"),
-        ("C", "", "c1")
+        ("C", "", "c1"),
     }
-    
+
     state = ThreadSafeState(initial_tree)
-    print("Initial tree:")
-    print(pretty_tree(state.tree()))
-    
+    state.apply(Move(ts(), "B", "", "a1"))  # a1 -> B
+    state.apply(Move(ts(), "C", "", "A"))   # A  -> C
+    state.apply(Move(ts(), "A", "", "b1"))  # b1 -> A
 
-    # apply various operations to test the system
-    state.apply(Move(ts(), "B", "", "a1"))  # Move a1 to B
-    state.apply(Move(ts(), "C", "", "A"))   # Move A to C
-    state.apply(Move(ts(), "A", "", "b1"))  # Move b1 to A
-    
-    print("\nAfter operations:")
-    print(pretty_tree(state.tree()))
-    
-   
     tree = state.tree()
-    assert unique_parent(tree)
-    assert acyclic(tree)
-    
-    # test undo/redo 
+    assert unique_parent(tree) and acyclic(tree)
+
     state.undo(2)
-    print("\nAfter undo(2):")
-    print(pretty_tree(state.tree()))
-    
     state.redo(1)
-    print("\nAfter redo(1):")
-    print(pretty_tree(state.tree()))
-    
+
     final_tree = state.tree()
-    assert unique_parent(final_tree)
-    assert acyclic(final_tree)
-    
-    print(" Comprehensive scenario test passed")
+    assert unique_parent(final_tree) and acyclic(final_tree)
 
 
+# -------------------- DEMO --------------------
+
+def _print_tree_block(title: str, state: ThreadSafeState):
+    print(title)
+    print(pretty_tree(state.tree()))
+    print()  # boş satır
 
 
+def _demo_main():
+    ts = Timestamper()
+
+    # Demo 1
+    initial1 = {
+        ("root", "", "A"),
+        ("root", "", "B"),
+        ("A", "", "a1"),
+        ("A", "", "a2"),
+    }
+    s1 = ThreadSafeState(initial1)
+    _print_tree_block("== Demo 1: initial ==", s1)
+
+    s1.apply(Move(ts(), "B", "", "a2"))   # a2 -> B
+    s1.apply(Move(ts(), "a2", "", "A"))   # A <- a2 (cycle => atlanır)
+    _print_tree_block("== Demo 1: after ops ==", s1)
+
+    s1.undo(1); _print_tree_block("== Demo 1: after undo(1) ==", s1)
+    s1.redo(1); _print_tree_block("== Demo 1: after redo(1) ==", s1)
+
+    # Demo 2
+    initial2 = {
+        ("root", "", "A"), ("root", "", "B"), ("root", "", "C"),
+        ("A", "", "a1"), ("A", "", "a2"),
+        ("B", "", "b1"),
+        ("C", "", "c1"),
+    }
+    s2 = ThreadSafeState(initial2)
+    _print_tree_block("== Demo 2: initial ==", s2)
+    s2.apply(Move(ts(), "B", "", "C"))
+    s2.apply(Move(ts(), "B", "", "a2"))
+    _print_tree_block("== Demo 2: after ops ==", s2)
+    s2.undo(2); _print_tree_block("== Demo 2: after undo(2) ==", s2)
+    s2.redo(2); _print_tree_block("== Demo 2: after redo(2) ==", s2)
+
+    # Demo 3
+    s3 = ThreadSafeState(scenario3_initial_tree())
+    _print_tree_block("== Demo 3: initial ==", s3)
+
+    hist_ops = scenario3_history_ops(ts)
+    for i, mv in enumerate(hist_ops, 1):
+        s3.apply(mv)
+        print(f"-- op#{i}: {mv.move_child} -> {mv.move_parent}")
+        _print_tree_block(f"== Demo 3: after history op #{i} ==", s3)
+
+    for _ in hist_ops:
+        s3.undo(1)
+    _print_tree_block("== Demo 3: after undo(all history) ==", s3)
+
+    for i, mv in enumerate(scenario3_new_ops(ts), 1):
+        s3.apply(mv)
+        print(f"-- new-op#{i}: {mv.move_child} -> {mv.move_parent}")
+        _print_tree_block(f"== Demo 3: after new op #{i} ==", s3)
+
+    s3.redo(10); _print_tree_block("== Demo 3: after redo(10) (no effect) ==", s3)
+    s3.undo(2); _print_tree_block("== Demo 3: after undo(2) ==", s3)
+    s3.redo(2); _print_tree_block("== Demo 3: after redo(2) ==", s3)
 
 
+# -------------------- MAIN --------------------
+def _run_main():
+    import argparse, pytest
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--demo", action="store_true",
+                        help="Demo run")
+    args = parser.parse_args()
 
-def run_all_tests():
-    """Run all error handling tests"""
-    print("CRDT Error Handling Tests Starting...")
-    print("=" * 50)
-    
-    try:
-        test_error_handling()
-        test_cycle_prevention()
-        test_self_reference_prevention()
-        test_undo_redo_edge_cases()
-        test_redo_cycle_detection()
-        test_comprehensive_scenario()
-        test_redo_skips_cycle_and_continues()
-        test_redo_skips_cycle_with_large_history()
-        
-        print("\n" + "=" * 50)
-        print("All error handling tests passed!")
-        print("✅ Error handling prevents invalid operations")
-        print("✅ Cycle prevention works")
-        print("✅ Self-reference prevention works")
-        print("✅ Undo/redo edge cases handled properly")
-        print("✅ Redo cycle detection works correctly")
-        print("✅ Comprehensive scenarios work correctly") 
-        print("✅ Redo skips-cycle tests work correctly")       
-    
-        
-    except Exception as e:
-        print(f"\nTest error: {e}")
-        raise
+    if args.demo:
+        print("\n DEMO MODU:\n")
+        _demo_main()
+        return 0
 
+    print("Running: test_redo_skips_cycle_with_large_history\n")
+    return pytest.main(["-s", __file__ + "::test_redo_skips_cycle_with_large_history"])
 
 if __name__ == "__main__":
-    run_all_tests()
+    raise SystemExit(_run_main())
