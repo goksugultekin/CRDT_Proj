@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRDT Tree Editor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌳 CRDT Tree Editor</h1>
+            <p class="subtitle">Distributed Collaborative Tree Editing</p>
+        </header>
+
+        <div class="main-content">
+            <div class="left-panel">
+                <div class="card">
+                    <h2>Add Node</h2>
+                    <form id="apply-form">
+                        <div class="form-group">
+                            <label for="parent">Parent Node:</label>
+                            <input type="text" id="parent" name="parent" placeholder="e.g., root" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="meta">Metadata (optional):</label>
+                            <input type="text" id="meta" name="meta" placeholder="e.g., label">
+                        </div>
+                        <div class="form-group">
+                            <label for="child">Child Node:</label>
+                            <input type="text" id="child" name="child" placeholder="e.g., A" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply Move</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Batch Operations</h2>
+                    <div id="batch-operations">
+                        <div class="batch-item">
+                            <input type="text" class="batch-parent" placeholder="Parent">
+                            <input type="text" class="batch-meta" placeholder="Meta">
+                            <input type="text" class="batch-child" placeholder="Child">
+                            <button type="button" class="btn-remove" onclick="removeBatchItem(this)">×</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addBatchItem()">+ Add Item</button>
+                    <button type="button" class="btn btn-primary" onclick="applyBatch()">Apply Batch</button>
+                </div>
+
+                <div class="card">
+                    <h2>History</h2>
+                    <div class="button-group">
+                        <button type="button" class="btn btn-secondary" onclick="undo()">↶ Undo</button>
+                        <button type="button" class="btn btn-secondary" onclick="redo()">↷ Redo</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Connection Status</h2>
+                    <div id="connection-status" class="status disconnected">
+                        <span class="status-indicator"></span>
+                        <span id="status-text">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="card tree-card">
+                    <div class="card-header">
+                        <h2>Tree Structure</h2>
+                        <button type="button" class="btn btn-small" onclick="refreshTree()">🔄 Refresh</button>
+                    </div>
+                    <div id="tree-display" class="tree-display">
+                        <div class="loading">Loading tree...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Raw Tree Data</h2>
+                    <pre id="raw-tree" class="raw-data">[]</pre>
+                </div>
+            </div>
+        </div>
+
+        <div id="notification" class="notification"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

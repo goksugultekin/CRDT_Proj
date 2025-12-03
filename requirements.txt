@@ -1,0 +1,16 @@
+# Core dependencies for CRDT project
+# No external dependencies required for basic functionality
+
+# ZeroMQ dependencies for distributed operations
+pyzmq>=24.0.0
+
+# Web application dependencies
+Flask>=2.3.0
+Flask-SocketIO>=5.3.0
+python-socketio>=5.8.0
+
+# Optional development dependencies (uncomment if needed):
+# pytest>=7.0.0
+# black>=22.0.0
+# flake8>=4.0.0
+# mypy>=0.950
