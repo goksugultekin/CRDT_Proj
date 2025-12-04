@@ -1,23 +1,8 @@
 {
   "peers": [
-    {
-      "id": "node_A",
-      "ip": "10.0.1.10",
-      "pub_port": 5551,
-      "sync_port": 5552
-    },
-    {
-      "id": "node_B",
-      "ip": "10.0.1.11",
-      "pub_port": 5561,
-      "sync_port": 5562
-    },
-    {
-      "id": "node_C",
-      "ip": "10.0.1.12",
-      "pub_port": 5571,
-      "sync_port": 5572
-    }
+    { "id": "node_A", "ip": "127.0.0.1", "pub_port": 5551, "sync_port": 5552 },
+    { "id": "node_B", "ip": "127.0.0.1", "pub_port": 5561, "sync_port": 5562 },
+    { "id": "node_C", "ip": "127.0.0.1", "pub_port": 5571, "sync_port": 5572 }
   ],
   "my_id": "node_B"
 }
